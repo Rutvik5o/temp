@@ -1,20 +1,21 @@
-# app_streamlit_full_themed.py
 import streamlit as st
 import pandas as pd, numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import os, io
 
-st.set_page_config(page_title='Customer Churn Analyzer — Themed', layout='wide',
+st.set_page_config(page_title='Customer Churn Analyzer — Themed (Readable)', layout='wide',
                    initial_sidebar_state='expanded')
 
-# CSS / Theme
-CSS = """
+# Improved CSS: ensure readable text colors, darker muted text, and accessible contrast for cards
+CSS = '''
 <style>
+/* Page background */
 [data-testid="stAppViewContainer"] > .main {
   background: linear-gradient(180deg,#f7fbff 0%,#f0f7ff 35%,#ffffff 100%);
   padding-top: 0.5rem;
 }
+/* Header card with strong contrast */
 .header-card {
   background: linear-gradient(90deg, #0f172a 0%, #0ea5a3 100%);
   color: white;
@@ -22,12 +23,28 @@ CSS = """
   border-radius: 12px;
   box-shadow: 0 6px 18px rgba(2,6,23,0.12);
 }
+/* Info card: white background, dark text for readability */
 .info-card {
-  background: white;
+  background: #ffffff;
+  color: #0f172a; /* dark text */
   border-radius: 10px;
   padding: 12px;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  font-size: 14px;
+  line-height: 1.4;
 }
+/* Tips box (small) with readable muted color */
+.small-muted {
+  color: #1f2937; /* dark slate */
+  font-size: 13px;
+}
+/* Sidebar tweaks */
+section[data-testid="stSidebar"] .css-1lcbmhc {
+  background: linear-gradient(180deg,#ffffff, #f8fafc);
+  border-radius: 8px;
+  padding: 12px;
+}
+/* Buttons */
 .stButton>button {
   background: linear-gradient(90deg,#0ea5a3,#06b6d4) !important;
   color: white;
@@ -36,22 +53,26 @@ CSS = """
   border-radius: 8px;
   font-weight: 600;
 }
-.small-muted { color: #64748b; font-size:13px; }
+/* Improve default dataframe/table header contrast */
+[data-testid="stDataFrameContainer"] th {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
 </style>
-"""
+'''
 st.markdown(CSS, unsafe_allow_html=True)
 
 # Header
-st.markdown('<div class="header-card"><h2 style="margin:0">Customer Churn Analyzer</h2><div class="small-muted">Upload a CSV, pick columns, filter segments and explore retention & churn.</div></div>', unsafe_allow_html=True)
-st.write("")  # spacing
+st.markdown('<div class="header-card"><h2 style="margin:0">Customer Churn Analyzer</h2><div class="small-muted">Upload a dataset, choose columns, and explore retention & churn with beautiful interactive charts.</div></div>', unsafe_allow_html=True)
+st.write('')  # spacing
 
-# Upload and tips
+# Upload and tips area
 col_left, col_right = st.columns([2,1])
 with col_left:
-    uploaded = st.file_uploader("Upload CSV (leave empty to use sample)", type=["csv"], key="uploader")
+    uploaded = st.file_uploader("Upload CSV (leave empty to use sample)", type=["csv"], key="uploader_readable")
     st.markdown('<div class="small-muted">Accepted: CSV. If empty, sample dataset at /mnt/data/chrundata.csv will be used (if present).</div>', unsafe_allow_html=True)
 with col_right:
-    st.markdown('<div class="info-card"><strong>Tips</strong><br>1) Select correct columns in sidebar.<br>2) Use filters to segment data.<br>3) Click Run analysis.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="info-card"><strong>Tips</strong><br>1) Select correct columns in the sidebar.<br>2) Use filters to segment data.<br>3) Click Run analysis.</div>', unsafe_allow_html=True)
 
 # Load data
 SAMPLE = "/mnt/data/chrundata.csv"
@@ -73,16 +94,16 @@ else:
         st.error(f"Uploaded file could not be read: {e}")
         st.stop()
 
-# Sidebar selectors (each widget has unique key)
+# Sidebar selectors with unique keys
 st.sidebar.header("Configure analysis")
 cols = df.columns.tolist()
-cust_id_col = st.sidebar.selectbox("Customer ID column", ["(none)"] + cols, index=(1 if "customerID" in cols else 0), key="sid_cust")
-churn_col = st.sidebar.selectbox("Churn flag column", ["(none)"] + cols, index=(cols.index("Churn")+1 if "Churn" in cols else 0), key="sid_churn")
-tenure_col = st.sidebar.selectbox("Tenure (months) column (optional)", ["(none)"] + cols, index=(cols.index("tenure")+1 if "tenure" in cols else 0), key="sid_tenure")
-signup_col = st.sidebar.selectbox("Signup / start date column (optional)", ["(none)"] + cols, key="sid_signup")
-last_col = st.sidebar.selectbox("Last-active / end date column (optional)", ["(none)"] + cols, key="sid_last")
+cust_id_col = st.sidebar.selectbox("Customer ID column", ["(none)"] + cols, index=(1 if "customerID" in cols else 0), key="sid_cust_r")
+churn_col = st.sidebar.selectbox("Churn flag column", ["(none)"] + cols, index=(cols.index("Churn")+1 if "Churn" in cols else 0), key="sid_churn_r")
+tenure_col = st.sidebar.selectbox("Tenure (months) column (optional)", ["(none)"] + cols, index=(cols.index("tenure")+1 if "tenure" in cols else 0), key="sid_tenure_r")
+signup_col = st.sidebar.selectbox("Signup / start date column (optional)", ["(none)"] + cols, key="sid_signup_r")
+last_col = st.sidebar.selectbox("Last-active / end date column (optional)", ["(none)"] + cols, key="sid_last_r")
 
-# Build list of possible segments (unique and present)
+# Segment filters
 candidate_segments = ["Contract","InternetService","PaymentMethod","Payment Method","Plan"]
 possible_segments = [c for c in candidate_segments if c in cols]
 st.sidebar.markdown("---")
@@ -90,18 +111,16 @@ st.sidebar.header("Segment filters (optional)")
 segment_filters = {}
 for i, s in enumerate(possible_segments):
     vals = sorted(df[s].dropna().unique().tolist())
-    # provide safe defaults even if vals is empty
     if not vals:
         segment_filters[s] = []
-        st.sidebar.write(f"{s}: (no values)", key=f"seginfo_{i}")
+        st.sidebar.write(f"{s}: (no values)", key=f"seginfo_r_{i}")
     else:
-        # give each multiselect a unique key
-        segment_filters[s] = st.sidebar.multiselect(f"Filter {s}", options=vals, default=vals, key=f"seg_{i}")
+        segment_filters[s] = st.sidebar.multiselect(f"Filter {s}", options=vals, default=vals, key=f"seg_r_{i}")
 
 st.sidebar.markdown("---")
-run = st.sidebar.button("Run analysis", key="run_btn")
+run = st.sidebar.button("Run analysis", key="run_btn_r")
 
-# Helper to normalize churn column
+# Helper to normalize churn values
 def normalize_churn(series):
     if series.dtype == object:
         return series.map(lambda x: 1 if str(x).strip().lower() in ['yes','y','true','1','t','churn','exited'] else (0 if str(x).strip().lower() in ['no','n','false','0','f','stay','retained'] else None))
@@ -111,14 +130,13 @@ def normalize_churn(series):
 # Run analysis
 if run:
     df2 = df.copy()
-    # apply segment filters safely
     for s, selvals in segment_filters.items():
         if selvals:
             df2 = df2[df2[s].isin(selvals)]
     st.markdown('<div class="info-card"><strong>Filtered sample</strong></div>', unsafe_allow_html=True)
     st.dataframe(df2.head())
 
-    # churn
+    # churn mapping
     churn_key = None
     churn_rate = None
     if churn_col != "(none)":
@@ -129,7 +147,7 @@ if run:
         except Exception:
             churn_rate = None
 
-    # Metrics row
+    # metrics
     c1, c2, c3 = st.columns(3)
     if churn_rate is not None:
         c1.metric("Overall churn rate", f"{churn_rate:.2%}")
@@ -145,7 +163,7 @@ if run:
     st.markdown("---")
     st.subheader("Visualizations")
 
-    # Row: churn pie + retention curve
+    # churn distribution and retention curve
     left, right = st.columns([1,2])
     with left:
         st.markdown('<div class="info-card"><strong>Churn distribution</strong></div>', unsafe_allow_html=True)
@@ -171,7 +189,7 @@ if run:
             fig.update_yaxes(tickformat=".0%")
             fig.update_layout(plot_bgcolor="white", paper_bgcolor="rgba(0,0,0,0)")
             st.plotly_chart(fig, use_container_width=True)
-            st.download_button("Download retention CSV", data=ret_df.to_csv(index=False).encode("utf-8"), file_name="retention_by_tenure.csv", key="down_ret")
+            st.download_button("Download retention CSV", data=ret_df.to_csv(index=False).encode("utf-8"), file_name="retention_by_tenure.csv", key="down_ret_r")
         else:
             st.info("Tenure column not selected or not numeric.")
 
@@ -198,7 +216,7 @@ if run:
                                                hovertemplate="Cohort: %{y}<br>Months: %{x}<br>Retention: %{z:.1f}%"))
             heatmap.update_layout(title="Cohort retention heatmap (percent)", xaxis_title="Months since cohort", yaxis_title="Cohort month", height=500)
             st.plotly_chart(heatmap, use_container_width=True)
-            st.download_button("Download cohort CSV", data=pivot.reset_index().to_csv(index=False).encode("utf-8"), file_name="cohort_pivot.csv", key="down_cohort")
+            st.download_button("Download cohort CSV", data=pivot.reset_index().to_csv(index=False).encode("utf-8"), file_name="cohort_pivot.csv", key="down_cohort_r")
         except Exception as e:
             st.error(f"Failed to compute cohort pivot: {e}")
     else:
@@ -229,7 +247,7 @@ if run:
 
     st.markdown("---")
     csv_all = df2.to_csv(index=False).encode("utf-8")
-    st.download_button("Download filtered dataset (CSV)", data=csv_all, file_name="filtered_dataset.csv", key="down_all")
+    st.download_button("Download filtered dataset (CSV)", data=csv_all, file_name="filtered_dataset.csv", key="down_all_r")
 
     st.markdown('<div class="small-muted">App: Themed UI — gradient header, cards, interactive Plotly charts, export buttons.</div>', unsafe_allow_html=True)
 
