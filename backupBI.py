@@ -6,8 +6,11 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import os
 
-st.set_page_config(page_title='Customer Churn Analyzer — PowerBI Dark', layout='wide',
-                   initial_sidebar_state='expanded')
+st.set_page_config(
+    page_title='Customer Churn Analyzer — PowerBI Dark',
+    layout='wide',
+    initial_sidebar_state='expanded'
+)
 
 # ------------------------- COLOR PALETTE ---------------------------------
 # Professional, colorful palette for all bar/hist/box charts
@@ -223,7 +226,7 @@ if run:
             months = list(range(0, max_m+1))
             retention = [(df2[tenure_col] >= m).sum() / max(total, 1) for m in months]
             ret_df = pd.DataFrame({'month': months, 'retention_rate': retention})
-            fig = px.line(ret_df, x='month', y='retention_rate', markers=True, color_discrete_sequence=[ACCENT]) color_discrete_sequence=[ACCENT])
+            fig = px.line(ret_df, x='month', y='retention_rate', markers=True, color_discrete_sequence=[ACCENT], color_discrete_sequence=[ACCENT])
             fig.update_traces(line=dict(width=4, color='#0ea5a3'), marker=dict(size=6))
             fig.update_yaxes(tickformat='%')
             fig = dark_plotly_layout(fig, height=380, showlegend=False)
