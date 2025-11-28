@@ -319,16 +319,28 @@ if run:
 
     st.markdown('---', unsafe_allow_html=True)
 
-    # Correlation heatmap
+    # Correlation heatmap (robust + colorful)
     st.markdown('<div class="chart-card"><strong>🧭 Numeric Correlation</strong></div>', unsafe_allow_html=True)
     num_cols = [c for c in ['tenure','MonthlyCharges','TotalCharges'] if c in df2.columns]
     if num_cols and churn_key:
-        corr = df2[num_cols + [churn_key]].corr()
-        z = corr.values
-        fig = go.Figure(data=go.Heatmap(z=z, x=corr.columns, y=corr.index, colorscale='Tealgrn'))
-        fig.update_traces(colorbar=dict(title="corr"))
-        fig = dark_plotly_layout(fig, height=360, showlegend=False)
-        st.plotly_chart(fig, use_container_width=True)
+        # Coerce numeric, include churn as numeric
+        corr_df = df2[num_cols].copy()
+        for c in corr_df.columns:
+            corr_df[c] = pd.to_numeric(corr_df[c], errors='coerce')
+        # ensure churn numeric
+        corr_df['_churn_for_corr'] = pd.to_numeric(df2[churn_key], errors='coerce')
+        # drop rows with all-NaN
+        corr_df = corr_df.dropna(how='all')
+        if corr_df.shape[0] >= 2:
+            corr = corr_df.corr()
+            z = corr.values
+            # Use a colorful diverging palette
+            fig = go.Figure(data=go.Heatmap(z=z, x=corr.columns, y=corr.index, colorscale='RdYlBu', reversescale=True))
+            fig.update_traces(colorbar=dict(title="corr"))
+            fig = dark_plotly_layout(fig, height=360, showlegend=False)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info('Not enough numeric rows after coercion to compute correlation.')
     else:
         st.info('Not enough numeric columns for correlation.')
 
