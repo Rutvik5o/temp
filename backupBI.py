@@ -6,11 +6,13 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import os
 
+# ------------------------- PAGE CONFIG (FIXED, NO INDENTATION ERRORS) -------------------------
 st.set_page_config(
     page_title='Customer Churn Analyzer — PowerBI Dark',
     layout='wide',
     initial_sidebar_state='expanded'
 )
+
 
 # ------------------------- COLOR PALETTE ---------------------------------
 # Professional, colorful palette for all bar/hist/box charts
