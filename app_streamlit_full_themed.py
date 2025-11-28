@@ -1,21 +1,78 @@
 import streamlit as st
-import pandas as pd, numpy as np
+import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-import os, io
+import os
 
-st.set_page_config(page_title='Customer Churn Analyzer — Themed (Readable)', layout='wide',
-                   initial_sidebar_state='expanded')
+from sentence_transformers import SentenceTransformer
+from sklearn.neighbors import NearestNeighbors
 
-# Improved CSS: ensure readable text colors, darker muted text, and accessible contrast for cards
+############################
+# BASIC LLM PLACEHOLDER
+############################
+# TODO: Replace this function with your real LLM API call
+# (e.g., OpenAI, Groq, etc.)
+def call_llm(prompt: str) -> str:
+    # SIMPLE FALLBACK so app runs even without an API:
+    # Just return the last lines of the prompt.
+    return "LLM placeholder: connect a real LLM API here to generate a rich answer.\n\nPrompt preview:\n" + prompt[-500:]
+
+
+############################
+# RAG SETUP (STATIC DOCS)
+############################
+
+EXPLANATION_DOCS = [
+    """
+Churn rate is the percentage of customers who stop using a service over a period.
+Retention is the percentage of customers who stay over time.
+A retention curve usually starts high and then gradually declines as customers leave.
+If the curve drops sharply after a certain month, that is a risk point for churn.
+""",
+    """
+Cohort analysis groups customers by the month they started and tracks what fraction remain active in later months.
+A cohort heatmap shows retention percentages by cohort and by months since signup.
+Rows (cohorts) with faster color fading indicate worse retention.
+""",
+    """
+Segment analysis compares retention between groups such as Contract type, InternetService, or PaymentMethod.
+If month-to-month contracts churn faster than two-year contracts, long-term contracts retain better.
+Look for lines that drop more steeply in segmented retention charts.
+"""
+]
+
+@st.cache_resource(show_spinner=False)
+def build_rag_index(docs):
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    embs = model.encode(docs)
+    nn = NearestNeighbors(n_neighbors=min(3, len(docs)), metric="cosine")
+    nn.fit(embs)
+    return model, nn, embs
+
+def rag_retrieve(model, nn, embs, docs, query, top_k=3):
+    q_emb = model.encode([query])
+    _, idx = nn.kneighbors(q_emb, n_neighbors=min(top_k, len(docs)))
+    return [docs[i] for i in idx[0]]
+
+model, nn, embs = build_rag_index(EXPLANATION_DOCS)
+
+############################
+# STREAMLIT UI + CSS
+############################
+
+st.set_page_config(
+    page_title='RAG Customer Churn Analyzer',
+    layout='wide',
+    initial_sidebar_state='expanded'
+)
+
 CSS = '''
 <style>
-/* Page background */
 [data-testid="stAppViewContainer"] > .main {
   background: linear-gradient(180deg,#f7fbff 0%,#f0f7ff 35%,#ffffff 100%);
   padding-top: 0.5rem;
 }
-/* Header card with strong contrast */
 .header-card {
   background: linear-gradient(90deg, #0f172a 0%, #0ea5a3 100%);
   color: white;
@@ -23,28 +80,19 @@ CSS = '''
   border-radius: 12px;
   box-shadow: 0 6px 18px rgba(2,6,23,0.12);
 }
-/* Info card: white background, dark text for readability */
 .info-card {
   background: #ffffff;
-  color: #0f172a; /* dark text */
+  color: #0f172a;
   border-radius: 10px;
   padding: 12px;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
   font-size: 14px;
   line-height: 1.4;
 }
-/* Tips box (small) with readable muted color */
 .small-muted {
-  color: #1f2937; /* dark slate */
+  color: #1f2937;
   font-size: 13px;
 }
-/* Sidebar tweaks */
-section[data-testid="stSidebar"] .css-1lcbmhc {
-  background: linear-gradient(180deg,#ffffff, #f8fafc);
-  border-radius: 8px;
-  padding: 12px;
-}
-/* Buttons */
 .stButton>button {
   background: linear-gradient(90deg,#0ea5a3,#06b6d4) !important;
   color: white;
@@ -53,7 +101,6 @@ section[data-testid="stSidebar"] .css-1lcbmhc {
   border-radius: 8px;
   font-weight: 600;
 }
-/* Improve default dataframe/table header contrast */
 [data-testid="stDataFrameContainer"] th {
   background-color: #f1f5f9 !important;
   color: #0f172a !important;
@@ -62,18 +109,20 @@ section[data-testid="stSidebar"] .css-1lcbmhc {
 '''
 st.markdown(CSS, unsafe_allow_html=True)
 
-# Header
 st.markdown(
-    '<div class="header-card"><h2 style="margin:0">Customer Churn Analyzer</h2>'
-    '<div class="small-muted">Upload a dataset, choose columns, and explore retention & churn with beautiful interactive charts.</div></div>',
+    '<div class="header-card"><h2 style="margin:0">RAG‑Based Customer Churn Analyzer</h2>'
+    '<div class="small-muted">Upload a churn dataset, ask questions like “What’s the retention trend?”, and get AI‑generated answers plus charts.</div></div>',
     unsafe_allow_html=True
 )
-st.write('')  # spacing
+st.write("")
 
-# Upload and tips area
+############################
+# DATA LOAD
+############################
+
 col_left, col_right = st.columns([2, 1])
 with col_left:
-    uploaded = st.file_uploader("Upload CSV (leave empty to use sample)", type=["csv"], key="uploader_readable")
+    uploaded = st.file_uploader("Upload CSV (leave empty to use sample)", type=["csv"])
     st.markdown(
         '<div class="small-muted">Accepted: CSV. If empty, sample dataset at /mnt/data/chrundata.csv will be used (if present).</div>',
         unsafe_allow_html=True
@@ -81,18 +130,17 @@ with col_left:
 with col_right:
     st.markdown(
         '<div class="info-card"><strong>Tips</strong><br>1) Select correct columns in the sidebar.<br>'
-        '2) Use filters to segment data.<br>3) Click Run analysis.</div>',
+        '2) Use filters to segment data.<br>3) Ask a question and click Run analysis.</div>',
         unsafe_allow_html=True
     )
 
-# Load data
 SAMPLE = "/mnt/data/chrundata.csv"
 if uploaded is None:
     if os.path.exists(SAMPLE):
         try:
             df = pd.read_csv(SAMPLE)
             st.success("Loaded sample dataset.")
-        except Exception as e:
+        except Exception:
             st.error("Sample dataset could not be read. Upload a CSV.")
             st.stop()
     else:
@@ -105,43 +153,41 @@ else:
         st.error(f"Uploaded file could not be read: {e}")
         st.stop()
 
-# Sidebar selectors with unique keys
+############################
+# SIDEBAR CONFIG
+############################
+
 st.sidebar.header("Configure analysis")
 cols = df.columns.tolist()
+
 cust_id_col = st.sidebar.selectbox(
     "Customer ID column", ["(none)"] + cols,
-    index=(1 if "customerID" in cols else 0),
-    key="sid_cust_r"
+    index=(1 if "customerID" in cols else 0)
 )
 churn_col = st.sidebar.selectbox(
     "Churn flag column", ["(none)"] + cols,
-    index=(cols.index("Churn") + 1 if "Churn" in cols else 0),
-    key="sid_churn_r"
+    index=(cols.index("Churn") + 1 if "Churn" in cols else 0)
 )
 tenure_col = st.sidebar.selectbox(
     "Tenure (months) column (optional)", ["(none)"] + cols,
-    index=(cols.index("tenure") + 1 if "tenure" in cols else 0),
-    key="sid_tenure_r"
+    index=(cols.index("tenure") + 1 if "tenure" in cols else 0)
 )
 signup_col = st.sidebar.selectbox(
-    "Signup / start date column (optional)", ["(none)"] + cols,
-    key="sid_signup_r"
+    "Signup / start date column (optional)", ["(none)"] + cols
 )
 last_col = st.sidebar.selectbox(
-    "Last-active / end date column (optional)", ["(none)"] + cols,
-    key="sid_last_r"
+    "Last-active / end date column (optional)", ["(none)"] + cols
 )
 
-# Query input for natural language
 st.sidebar.markdown("---")
-query_text = st.sidebar.text_input(
-    "Ask a question about retention",
-    value="What's the retention trend?"
+question_text = st.sidebar.text_input(
+    "Ask a churn question",
+    value="What’s the retention trend?"
 )
 
-# Segment filters
 candidate_segments = ["Contract", "InternetService", "PaymentMethod", "Payment Method", "Plan"]
 possible_segments = [c for c in candidate_segments if c in cols]
+
 st.sidebar.markdown("---")
 st.sidebar.header("Segment filters (optional)")
 segment_filters = {}
@@ -149,43 +195,67 @@ for i, s in enumerate(possible_segments):
     vals = sorted(df[s].dropna().unique().tolist())
     if not vals:
         segment_filters[s] = []
-        st.sidebar.write(f"{s}: (no values)", key=f"seginfo_r_{i}")
+        st.sidebar.write(f"{s}: (no values)")
     else:
         segment_filters[s] = st.sidebar.multiselect(
-            f"Filter {s}",
-            options=vals,
-            default=vals,
-            key=f"seg_r_{i}"
+            f"Filter {s}", options=vals, default=vals
         )
 
 st.sidebar.markdown("---")
-run = st.sidebar.button("Run analysis", key="run_btn_r")
+run = st.sidebar.button("Run analysis")
 
-# Helper to normalize churn values
+############################
+# HELPERS
+############################
+
 def normalize_churn(series):
     if series.dtype == object:
         return series.map(
             lambda x: 1
-            if str(x).strip().lower() in ['yes', 'y', 'true', '1', 't', 'churn', 'exited']
+            if str(x).strip().lower() in ['yes','y','true','1','t','churn','exited']
             else (
-                0
-                if str(x).strip().lower() in ['no', 'n', 'false', '0', 'f', 'stay', 'retained']
+                0 if str(x).strip().lower() in ['no','n','false','0','f','stay','retained']
                 else None
             )
         )
-    else:
-        return series
+    return series
 
-# Run analysis
+def compute_retention_trend(df2, tenure_col_name):
+    if tenure_col_name == "(none)" or tenure_col_name not in df2.columns:
+        return None, None
+    if not pd.api.types.is_numeric_dtype(df2[tenure_col_name]):
+        return None, None
+    if len(df2) == 0:
+        return None, None
+
+    total = len(df2)
+    max_m = int(df2[tenure_col_name].dropna().astype(int).max())
+    months = list(range(0, max_m + 1))
+    retention = [(m, (df2[tenure_col_name] >= m).sum() / total) for m in months]
+    ret_df = pd.DataFrame(retention, columns=["month", "retention_rate"])
+
+    stats = {
+        "start": ret_df["retention_rate"].iloc[0],
+        "mid_idx": min(6, len(ret_df)-1),
+        "mid": ret_df["retention_rate"].iloc[min(6, len(ret_df)-1)],
+        "end": ret_df["retention_rate"].iloc[-1],
+        "last_month": int(ret_df["month"].iloc[-1]),
+    }
+    return ret_df, stats
+
+############################
+# MAIN ANALYSIS
+############################
+
 if run:
     df2 = df.copy()
     for s, selvals in segment_filters.items():
         if selvals:
             df2 = df2[df2[s].isin(selvals)]
+
     st.markdown('<div class="info-card"><strong>Filtered sample</strong></div>', unsafe_allow_html=True)
     st.dataframe(df2.head())
 
-    # churn mapping
     churn_key = None
     churn_rate = None
     if churn_col != "(none)":
@@ -196,7 +266,6 @@ if run:
         except Exception:
             churn_rate = None
 
-    # metrics
     c1, c2, c3 = st.columns(3)
     if churn_rate is not None:
         c1.metric("Overall churn rate", f"{churn_rate:.2%}")
@@ -212,7 +281,6 @@ if run:
     st.markdown("---")
     st.subheader("Visualizations")
 
-    # churn distribution and retention curve
     left, right = st.columns([1, 2])
     with left:
         st.markdown('<div class="info-card"><strong>Churn distribution</strong></div>', unsafe_allow_html=True)
@@ -233,57 +301,72 @@ if run:
 
     with right:
         st.markdown('<div class="info-card"><strong>Retention trend (tenure-based)</strong></div>', unsafe_allow_html=True)
-        if tenure_col != "(none)" and pd.api.types.is_numeric_dtype(df2[tenure_col]) and len(df2) > 0:
-            total = len(df2)
-            max_m = int(df2[tenure_col].dropna().astype(int).max())
-            months = list(range(0, max_m + 1))
-            retention = [(m, (df2[tenure_col] >= m).sum() / total) for m in months]
-            ret_df = pd.DataFrame(retention, columns=["month", "retention_rate"])
-
-            # Chart for retention trend
+        ret_df, stats = compute_retention_trend(df2, tenure_col)
+        if ret_df is not None:
             fig = px.line(
-                ret_df,
-                x="month",
-                y="retention_rate",
-                markers=True,
-                title="Retention trend over tenure"
+                ret_df, x="month", y="retention_rate",
+                markers=True, title="Retention trend over tenure"
             )
             fig.update_yaxes(tickformat=".0%")
             fig.update_layout(plot_bgcolor="white", paper_bgcolor="rgba(0,0,0,0)")
             st.plotly_chart(fig, use_container_width=True)
 
-            # Natural-language summary for "What's the retention trend?"
-            if "retention" in query_text.lower() and "trend" in query_text.lower():
-                if len(ret_df) > 0:
-                    start_ret = ret_df["retention_rate"].iloc[0]
-                    mid_idx = min(len(ret_df) - 1, 6)
-                    mid_ret = ret_df["retention_rate"].iloc[mid_idx]
-                    end_ret = ret_df["retention_rate"].iloc[-1]
-
-                    direction = "fairly stable"
-                    if end_ret < start_ret * 0.8:
-                        direction = "declining over time"
-                    elif end_ret > start_ret * 1.1:
-                        direction = "improving over time"
-
-                    st.markdown(
-                        f"""**Retention trend summary**  
-- Starting retention (month 0): {start_ret:.1%}  
-- Around month {ret_df['month'].iloc[mid_idx]}: {mid_ret:.1%}  
-- Latest month ({int(ret_df['month'].iloc[-1])}): {end_ret:.1%}  
-- Overall, retention is **{direction}** across the observed period."""
-                    )
-
-            # Download button for retention CSV
             st.download_button(
                 "Download retention CSV",
                 data=ret_df.to_csv(index=False).encode("utf-8"),
                 file_name="retention_by_tenure.csv",
-                key="down_ret_r"
+                key="down_ret"
             )
         else:
             st.info("Tenure column not selected or not numeric.")
 
+    ############################
+    # RAG‑BASED ANSWER
+    ############################
+    st.markdown("---")
+    st.subheader("RAG‑based answer to your question")
+
+    # Build metrics snippet for the LLM
+    metrics_lines = []
+    if churn_rate is not None:
+        metrics_lines.append(f"Overall churn rate: {churn_rate:.2%}")
+    if stats is not None:
+        metrics_lines.append(f"Retention start: {stats['start']:.1%}")
+        metrics_lines.append(f"Retention mid (month {stats['mid_idx']}): {stats['mid']:.1%}")
+        metrics_lines.append(f"Retention end (month {stats['last_month']}): {stats['end']:.1%}")
+
+    metrics_text = "\n".join(metrics_lines) if metrics_lines else "No retention metrics available."
+
+    # Retrieve explanatory context
+    rag_context = rag_retrieve(model, nn, embs, EXPLANATION_DOCS, question_text)
+    context_text = "\n\n".join(rag_context)
+
+    prompt = f"""
+You are a senior customer churn analyst.
+
+Use BOTH the data metrics and the documentation context below to answer the user's question.
+Focus on being clear and business‑friendly, in 3–6 sentences.
+
+[DATA METRICS]
+{metrics_text}
+
+[DOC CONTEXT]
+{context_text}
+
+[USER QUESTION]
+{question_text}
+
+[ANSWER]
+"""
+
+    answer = call_llm(prompt)
+    st.markdown(f"**Question:** {question_text}")
+    st.markdown("**Answer (RAG‑based):**")
+    st.write(answer)
+
+    ############################
+    # COHORT ANALYSIS
+    ############################
     st.markdown("---")
     st.subheader("Cohort Analysis")
     if signup_col != "(none)" and last_col != "(none)":
@@ -337,17 +420,14 @@ if run:
             )
             st.plotly_chart(heatmap, use_container_width=True)
 
-            st.download_button(
-                "Download cohort CSV",
-                data=pivot.reset_index().to_csv(index=False).encode("utf-8"),
-                file_name="cohort_pivot.csv",
-                key="down_cohort_r"
-            )
         except Exception as e:
             st.error(f"Failed to compute cohort pivot: {e}")
     else:
         st.info("Select both Signup and Last-active columns to enable cohort heatmap.")
 
+    ############################
+    # SEGMENTED RETENTION
+    ############################
     st.markdown("---")
     st.subheader("Segmented retention comparison")
     seg_col = None
@@ -389,13 +469,14 @@ if run:
         "Download filtered dataset (CSV)",
         data=csv_all,
         file_name="filtered_dataset.csv",
-        key="down_all_r"
+        key="down_all"
     )
 
     st.markdown(
-        '<div class="small-muted">App: Themed UI — gradient header, cards, interactive Plotly charts, export buttons.</div>',
+        '<div class="small-muted">RAG app: metrics + doc context → LLM answer, with interactive charts.</div>',
         unsafe_allow_html=True
     )
 
 else:
-    st.info("Select options in the sidebar and click Run analysis.")
+    st.info("Select options in the sidebar, type a question, and click Run analysis.")
+
