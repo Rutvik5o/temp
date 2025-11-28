@@ -9,6 +9,13 @@ import os
 st.set_page_config(page_title='Customer Churn Analyzer — PowerBI Dark', layout='wide',
                    initial_sidebar_state='expanded')
 
+# ------------------------- COLOR PALETTE ---------------------------------
+# Professional, colorful palette for all bar/hist/box charts
+PALETTE = px.colors.qualitative.Plotly  # easily readable set of colors
+ACCENT = '#0ea5a3'
+
+                   initial_sidebar_state='expanded')
+
 # ------------------------- DARK THEME CSS ---------------------------------
 CSS = r'''
 <style>
@@ -216,7 +223,7 @@ if run:
             months = list(range(0, max_m+1))
             retention = [(df2[tenure_col] >= m).sum() / max(total, 1) for m in months]
             ret_df = pd.DataFrame({'month': months, 'retention_rate': retention})
-            fig = px.line(ret_df, x='month', y='retention_rate', markers=True)
+            fig = px.line(ret_df, x='month', y='retention_rate', markers=True, color_discrete_sequence=[ACCENT]) color_discrete_sequence=[ACCENT])
             fig.update_traces(line=dict(width=4, color='#0ea5a3'), marker=dict(size=6))
             fig.update_yaxes(tickformat='%')
             fig = dark_plotly_layout(fig, height=380, showlegend=False)
@@ -228,7 +235,7 @@ if run:
         if churn_key and 'MonthlyCharges' in df2.columns:
             tmp = df2[["MonthlyCharges", churn_key]].dropna()
             tmp[churn_key] = tmp[churn_key].astype(int).map({0:'No',1:'Yes'})
-            fig = px.box(tmp, x=churn_key, y='MonthlyCharges', points='all')
+            fig = px.box(tmp, x=churn_key, y='MonthlyCharges', points='all', color_discrete_sequence=PALETTE)
             fig = dark_plotly_layout(fig, height=340)
             st.plotly_chart(fig, use_container_width=True)
         else:
@@ -239,7 +246,7 @@ if run:
             tmp = df2[["Contract", churn_key]].dropna()
             agg = tmp.groupby('Contract').agg(total=('Contract','count'), churned=(churn_key,'sum')).reset_index()
             agg['churn_rate'] = agg['churned'] / agg['total']
-            fig = px.bar(agg, x='Contract', y='churn_rate', text=agg['churn_rate'].apply(lambda x: f"{x:.0%}"))
+            fig = px.bar(agg, x='Contract', y='churn_rate', text=agg['churn_rate'].apply(lambda x: f"{x:.0%}", color_discrete_sequence=PALETTE))
             fig.update_traces(marker_line_width=0)
             fig = dark_plotly_layout(fig, height=360)
             st.plotly_chart(fig, use_container_width=True)
@@ -253,7 +260,7 @@ if run:
             counts = df2[churn_key].dropna().astype(int).value_counts().sort_index()
             vals = [counts.get(0,0), counts.get(1,0)]
             labels = ['Retained','Churned']
-            fig = px.pie(values=vals, names=labels, hole=0.45)
+            fig = px.pie(values=vals, names=labels, hole=0.45, color_discrete_sequence=PALETTE)
             fig.update_traces(textinfo='percent+label', textfont_size=13)
             fig = dark_plotly_layout(fig, height=300, showlegend=False)
             st.plotly_chart(fig, use_container_width=True)
@@ -280,7 +287,7 @@ if run:
                 rows.append({'feature': c, 'churn_rate_if_yes': churn_rate_flag})
             feat_df = pd.DataFrame(rows).sort_values('churn_rate_if_yes', ascending=False)
             if not feat_df.empty:
-                fig = px.bar(feat_df, x='churn_rate_if_yes', y='feature', orientation='h', text=feat_df['churn_rate_if_yes'].apply(lambda x: f"{x:.0%}"))
+                fig = px.bar(feat_df, x='churn_rate_if_yes', y='feature', orientation='h', text=feat_df['churn_rate_if_yes'].apply(lambda x: f"{x:.0%}", color_discrete_sequence=PALETTE))
                 fig = dark_plotly_layout(fig, height=360, showlegend=False)
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -298,7 +305,7 @@ if run:
             tmp = df2[['PaymentMethod', churn_key]].dropna()
             agg = tmp.groupby('PaymentMethod').agg(total=('PaymentMethod','count'), churned=(churn_key,'sum')).reset_index()
             agg['churn_rate'] = agg['churned'] / agg['total']
-            fig = px.bar(agg, x='PaymentMethod', y='churn_rate', text=agg['churn_rate'].apply(lambda x: f"{x:.0%}"))
+            fig = px.bar(agg, x='PaymentMethod', y='churn_rate', text=agg['churn_rate'].apply(lambda x: f"{x:.0%}", color_discrete_sequence=PALETTE))
             fig = dark_plotly_layout(fig, height=350)
             fig.update_xaxes(tickangle=-45)
             st.plotly_chart(fig, use_container_width=True)
@@ -311,7 +318,7 @@ if run:
             tmp = df2[['InternetService', churn_key]].dropna()
             agg = tmp.groupby('InternetService').agg(total=('InternetService','count'), churned=(churn_key,'sum')).reset_index()
             agg['churn_rate'] = agg['churned'] / agg['total']
-            fig = px.bar(agg, x='InternetService', y='churn_rate', text=agg['churn_rate'].apply(lambda x: f"{x:.0%}"))
+            fig = px.bar(agg, x='InternetService', y='churn_rate', text=agg['churn_rate'].apply(lambda x: f"{x:.0%}", color_discrete_sequence=PALETTE))
             fig = dark_plotly_layout(fig, height=350)
             st.plotly_chart(fig, use_container_width=True)
         else:
