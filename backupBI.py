@@ -185,7 +185,14 @@ if run:
     with k1:
         # FIXED Avg Tenure block
 avg_tenure_fmt = f"{avg_tenure:.1f}" if avg_tenure is not None else "N/A"
-st.markdown(f'<div class="metric-card"><div class="metric-sub">📅 Avg Tenure</div><div class="metric-value">{avg_tenure_fmt}</div></div>', unsafe_allow_html=True), unsafe_allow_html=True)
+st.markdown(
+    f'<div class="metric-card">'
+    f'<div class="metric-sub">📅 Avg Tenure</div>'
+    f'<div class="metric-value">{avg_tenure_fmt}</div>'
+    f'</div>',
+    unsafe_allow_html=True
+)
+, unsafe_allow_html=True)
     with k4:
         avg_monthly = df2['MonthlyCharges'].mean() if 'MonthlyCharges' in df2.columns else None
         st.markdown(f'<div class="metric-card"><div class="metric-sub">💳 Avg Monthly Charges</div><div class="metric-value">{(avg_monthly:.2f) if avg_monthly==avg_monthly else "N/A"}</div></div>', unsafe_allow_html=True)
