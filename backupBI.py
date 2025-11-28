@@ -183,14 +183,9 @@ if run:
 
     k1, k2, k3, k4 = st.columns(4)
     with k1:
-        st.markdown(f'<div class="metric-card"><div class="metric-sub">👥 Total Customers</div><div class="metric-value">{total_customers:,}</div></div>', unsafe_allow_html=True)
-    with k2:
-        if churn_rate is not None:
-            st.markdown(f'<div class="metric-card"><div class="metric-sub">🔴 Churn Rate</div><div class="metric-value">{churn_rate:.1%}</div></div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="metric-card"><div class="metric-sub">🔴 Churn Rate</div><div class="metric-value">N/A</div></div>', unsafe_allow_html=True)
-    with k3:
-        st.markdown(f'<div class="metric-card"><div class="metric-sub">📅 Avg Tenure</div><div class="metric-value">{{avg_tenure_fmt}}</div>">{(avg_tenure:.1f + 0) if avg_tenure is not None else "N/A"}</div></div>', unsafe_allow_html=True)
+        # FIXED Avg Tenure block
+avg_tenure_fmt = f"{avg_tenure:.1f}" if avg_tenure is not None else "N/A"
+st.markdown(f'<div class="metric-card"><div class="metric-sub">📅 Avg Tenure</div><div class="metric-value">{avg_tenure_fmt}</div></div>', unsafe_allow_html=True), unsafe_allow_html=True)
     with k4:
         avg_monthly = df2['MonthlyCharges'].mean() if 'MonthlyCharges' in df2.columns else None
         st.markdown(f'<div class="metric-card"><div class="metric-sub">💳 Avg Monthly Charges</div><div class="metric-value">{(avg_monthly:.2f) if avg_monthly==avg_monthly else "N/A"}</div></div>', unsafe_allow_html=True)
