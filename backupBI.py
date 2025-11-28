@@ -183,21 +183,26 @@ if run:
 
     k1, k2, k3, k4 = st.columns(4)
     with k1:
-        # FIXED Avg Tenure block
-avg_tenure_fmt = f"{avg_tenure:.1f}" if avg_tenure is not None else "N/A"
-st.markdown(
-    f'<div class="metric-card">'
-    f'<div class="metric-sub">📅 Avg Tenure</div>'
-    f'<div class="metric-value">{avg_tenure_fmt}</div>'
-    f'</div>',
-    unsafe_allow_html=True
-)
-, unsafe_allow_html=True)
+        html_k1 = '<div class="metric-card"><div class="metric-sub">👥 Total Customers</div><div class="metric-value">{:,}</div></div>'.format(total_customers)
+        st.markdown(html_k1, unsafe_allow_html=True)
+    with k2:
+        if churn_rate is not None:
+            html_k2 = '<div class="metric-card"><div class="metric-sub">🔴 Churn Rate</div><div class="metric-value">{:.1%}</div></div>'.format(churn_rate)
+            st.markdown(html_k2, unsafe_allow_html=True)
+        else:
+            html_k2 = '<div class="metric-card"><div class="metric-sub">🔴 Churn Rate</div><div class="metric-value">N/A</div></div>'
+            st.markdown(html_k2, unsafe_allow_html=True)
+    with k3:
+        avg_tenure_fmt = "N/A" if avg_tenure is None else "{:.1f}".format(avg_tenure)
+        html_k3 = '<div class="metric-card"><div class="metric-sub">📅 Avg Tenure</div><div class="metric-value">{}</div></div>'.format(avg_tenure_fmt)
+        st.markdown(html_k3, unsafe_allow_html=True)
     with k4:
         avg_monthly = df2['MonthlyCharges'].mean() if 'MonthlyCharges' in df2.columns else None
-        st.markdown(f'<div class="metric-card"><div class="metric-sub">💳 Avg Monthly Charges</div><div class="metric-value">{(avg_monthly:.2f) if avg_monthly==avg_monthly else "N/A"}</div></div>', unsafe_allow_html=True)
+        avg_monthly_fmt = "N/A" if avg_monthly is None or np.isnan(avg_monthly) else "{:.2f}".format(avg_monthly)
+        html_k4 = '<div class="metric-card"><div class="metric-sub">💳 Avg Monthly Charges</div><div class="metric-value">{}</div></div>'.format(avg_monthly_fmt)
+        st.markdown(html_k4, unsafe_allow_html=True)
 
-    st.markdown('---')
+    st.markdown('---', unsafe_allow_html=True)
 
     # Charts layout: 2-column main
     left_col, right_col = st.columns([2,1])
@@ -268,7 +273,6 @@ st.markdown(
                     continue
                 grp = pd.DataFrame({'flag': mapped, 'churn': tmp[churn_key]})
                 agg = grp.groupby('flag').agg(total=('churn','count'), churned=('churn','sum')).reset_index()
-                # churn rate for flag==1
                 try:
                     churn_rate_flag = agg.loc[agg['flag']==1, 'churned'].values[0] / agg.loc[agg['flag']==1, 'total'].values[0]
                 except Exception:
@@ -284,7 +288,7 @@ st.markdown(
         else:
             st.info('Service flag columns or churn mapping missing.')
 
-    st.markdown('---')
+    st.markdown('---', unsafe_allow_html=True)
 
     # MORE: Payment method and Internet service
     c1, c2 = st.columns(2)
@@ -313,7 +317,7 @@ st.markdown(
         else:
             st.info('InternetService or Churn missing.')
 
-    st.markdown('---')
+    st.markdown('---', unsafe_allow_html=True)
 
     # Correlation heatmap
     st.markdown('<div class="chart-card"><strong>🧭 Numeric Correlation</strong></div>', unsafe_allow_html=True)
@@ -329,7 +333,7 @@ st.markdown(
         st.info('Not enough numeric columns for correlation.')
 
     # Export
-    st.markdown('---')
+    st.markdown('---', unsafe_allow_html=True)
     csv_all = df2.to_csv(index=False).encode('utf-8')
     st.download_button('💾 Download Filtered Dataset', data=csv_all, file_name='churn_analysis_filtered.csv')
     st.markdown('<div class="small-muted">✨ Dark PowerBI-style • Clean • Focused</div>', unsafe_allow_html=True)
